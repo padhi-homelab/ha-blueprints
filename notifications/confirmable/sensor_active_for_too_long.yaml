@@ -13,6 +13,14 @@ blueprint:
           domain:
           - binary_sensor
           multiple: false
+    custom_friendly_name:
+      name: Friendly Name
+      description: |-
+        The friendly name to use in the notification message.
+        Leave empty to use the sensor's friendly name.
+      default: ""
+      selector:
+        text: {}
     additional_conditions:
       name: Additional Conditions (Optional)
       description: Extra conditions that must be met for the notification to trigger.
@@ -54,6 +62,9 @@ max: 5
 
 variables:
   target_sensor: !input target_entity
+
+  raw_name: !input custom_friendly_name
+  friendly_name: "{{ raw_name if raw_name != '' else state_attr(target_device, 'friendly_name') }}"
 
   raw_ack: !input ack_interval
   primary_text: >-
@@ -110,8 +121,7 @@ action:
     - action: !input notify_service
       data:
         message: >-
-          {{ state_attr(target_sensor, 'friendly_name') }} has been
-          {{ state_translated(target_sensor) | lower }}
+          {{ friendly_name }} has been {{ state_translated(target_sensor) | lower }}
           for {{ relative_time(states[target_sensor].last_changed) }}.
         data: >-
           {%- set payload = {
