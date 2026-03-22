@@ -25,6 +25,12 @@ blueprint:
         minutes: 10
       selector:
         duration: {}
+    additional_conditions:
+      name: Additional Conditions (Optional)
+      description: Extra conditions that must be met for the notification to trigger.
+      default: []
+      selector:
+        condition: {}
     nag_interval:
       name: Repeat Notifications After
       description: If ignored, how long to wait before sending another notification?
@@ -85,6 +91,8 @@ trigger:
   - "open"
   - "playing"
   for: !input trigger_duration
+
+condition: !input additional_conditions
 
 action:
 - repeat:
