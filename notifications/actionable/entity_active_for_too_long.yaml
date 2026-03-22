@@ -1,0 +1,174 @@
+blueprint:
+  name: Actionable Notification - Entity active for too long
+  description: >
+    Sends a mobile notification to deactivate a device
+    that has been active for too long.
+  domain: automation
+  input:
+    target_entity:
+      name: Target Device
+      description: The cover, light, media player or switch to monitor.
+      selector:
+        entity:
+          domain:
+          - cover
+          - light
+          - media_player
+          - switch
+          multiple: false
+    trigger_duration:
+      name: First Notification After
+      description: |-
+        For how long must the device be in the monitored state
+        before the first notification is sent?
+      default:
+        minutes: 10
+      selector:
+        duration: {}
+    nag_interval:
+      name: Repeat Notifications After
+      description: If ignored, how long to wait before sending another notification?
+      default:
+        minutes: 15
+      selector:
+        duration: {}
+    notify_service:
+      name: Notify Service
+      description: The name of your mobile app notify service (e.g., notify.my_phone).
+      default: notify.notify
+      selector:
+        text: {}
+
+mode: parallel
+max: 5
+
+variables:
+  target_device: !input target_entity
+  domain: "{{ target_device.split('.')[0] }}"
+
+  device_state: >-
+    {%- if domain in ['cover'] -%} open
+    {%- elif domain == 'media_player' -%} playing
+    {%- else -%} on {%- endif -%}
+
+  primary_text: >-
+    {%- if domain in ['cover'] -%} Close
+    {%- elif domain == 'media_player' -%} Pause
+    {%- else -%} Turn Off {%- endif -%}
+
+  raw_nag: !input nag_interval
+  ignore_text: >-
+    {%- if raw_nag is mapping -%}
+      {%- set h = raw_nag.get('hours', 0) | int -%}
+      {%- set m = raw_nag.get('minutes', 0) | int -%}
+      {%- set s = raw_nag.get('seconds', 0) | int -%}
+      {%- set time_str = [] -%}
+      {%- if h > 0 %}{% set time_str = time_str + [h ~ 'h'] -%}{%- endif -%}
+      {%- if m > 0 %}{% set time_str = time_str + [m ~ 'm'] -%}{%- endif -%}
+      {%- if s > 0 %}{% set time_str = time_str + [s ~ 's'] -%}{%- endif -%}
+      Ignore ({{ time_str | join(' ') }})
+    {%- else -%}
+      Ignore ({{ raw_nag }})
+    {%- endif -%}
+
+  uid: "{{ range(1000, 9999) | random }}{{ range(1000, 9999) | random }}"
+  action_primary: "action_primary_{{ uid }}"
+  action_ignore: "action_ignore_{{ uid }}"
+
+  notification_tag: "{{ 'nag_' ~ target_device }}"
+
+trigger:
+- platform: state
+  entity_id: !input target_entity
+  to:
+  - "on"
+  - "open"
+  - "playing"
+  for: !input trigger_duration
+
+action:
+- repeat:
+    while:
+    - condition: template
+      value_template: "{{ states(target_device) == device_state }}"
+    sequence:
+    - action: !input notify_service
+      data:
+        message: >-
+          {{ state_attr(target_device, 'friendly_name') }} has been
+          {{ device_state }} for {{ relative_time(states[target_device].last_changed) }}.
+          {{ primary_text }}?"
+        data:
+          tag: "{{ notification_tag }}"
+          notification_icon: "{{ state_attr(target_device, 'icon') or 'mdi:alert-circle' }}"
+          actions:
+          - action: "{{ action_primary }}"
+            title: "{{ primary_text }}"
+          - action: "{{ action_ignore }}"
+            title: "{{ ignore_text }}"
+      
+    - wait_for_trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "{{ action_primary }}"
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "{{ action_ignore }}"
+      - platform: state
+        entity_id: !input target_entity
+        to: "{{ states(target_device) != state_word }}"
+      timeout: !input nag_interval
+      continue_on_timeout: true
+      
+    - choose:
+      - conditions:
+        - condition: template
+          value_template: "{{ wait.trigger != none and wait.trigger.platform == 'event' and wait.trigger.event.data.action == action_primary }}"
+        sequence:
+        - choose:
+          - conditions:
+            - condition: template
+              value_template: "{{ domain == 'cover' }}"
+            sequence:
+            - action: cover.close_cover
+              target:
+                entity_id: !input target_entity
+          - conditions:
+            - condition: template
+              value_template: "{{ domain == 'media_player' }}"
+            sequence:
+            - action: media_player.media_pause
+              target:
+                entity_id: !input target_entity
+          default:
+          - action: homeassistant.turn_off
+            target:
+              entity_id: !input target_entity
+        - wait_for_trigger:
+          - platform: template
+            value_template: "{{ states(target_device) != machine_state }}"
+          timeout: !input nag_interval
+      - conditions:
+        - condition: template
+          value_template: "{{ wait.trigger != none and wait.trigger.platform == 'event' and wait.trigger.event.data.action == action_ignore }}"
+        sequence:
+        - action: !input notify_service
+          data:
+            message: clear_notification
+            data:
+              tag: "{{ notification_tag }}"
+        - wait_for_trigger:
+          - platform: template
+            value_template: "{{ states(target_device) != machine_state }}"
+          timeout: !input nag_interval
+      - conditions:
+        - condition: template
+          value_template: "{{ wait.trigger != none and wait.trigger.platform == 'template' }}"
+        sequence:
+        - action: !input notify_service
+          data:
+            message: clear_notification
+            data:
+              tag: "{{ notification_tag }}"
