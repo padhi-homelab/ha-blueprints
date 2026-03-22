@@ -1,6 +1,6 @@
 blueprint:
   name: Confirmable Notification - Sensor active for too long
-  description: >
+  description: >-
     Sends a mobile notification reminding that
     a sensor has been active for too long.
   domain: automation
