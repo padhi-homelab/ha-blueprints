@@ -83,9 +83,9 @@ variables:
     {%- else -%} Turning Off {%- endif -%}
 
   past_verb: >-
-    {%- if domain in ['cover'] -%} Closed
-    {%- elif domain == 'media_player' -%} Paused
-    {%- else -%} Turned Off {%- endif -%}
+    {%- if domain in ['cover'] -%} closed
+    {%- elif domain == 'media_player' -%} paused
+    {%- else -%} turned off {%- endif -%}
 
   raw_nag: !input nag_interval
   cancel_text: >-
@@ -97,9 +97,9 @@ variables:
       {%- if h > 0 %}{% set time_str = time_str + [h ~ 'h'] -%}{%- endif -%}
       {%- if m > 0 %}{% set time_str = time_str + [m ~ 'm'] -%}{%- endif -%}
       {%- if s > 0 %}{% set time_str = time_str + [s ~ 's'] -%}{%- endif -%}
-      Cancel ({{ time_str | join(' ') }})
+      Ignore for {{ time_str | join(' ') }}
     {%- else -%}
-      Cancel ({{ raw_nag }})
+      Ignore for {{ raw_nag }}
     {%- endif -%}
 
   raw_cancel: !input cancel_interval
@@ -179,10 +179,9 @@ action:
         event_type: mobile_app_notification_action
         event_data:
           action: "{{ action_cancel }}"
-      - platform: state
-        entity_id: !input target_entity
-        to: "{{ states(target_device) != device_state }}"
-      timeout: !input nag_interval
+      - platform: template
+        value_template: "{{ states(target_device) != device_state }}"
+      timeout: !input cancel_interval
       continue_on_timeout: true
     - choose:
       - conditions:
@@ -208,16 +207,11 @@ action:
             data:
               tag: "{{ notification_tag }}"
       default:
-      - choose:
-        - conditions:
-          - condition: template
-            value_template: "{{ wait.trigger != none }}"
-          sequence:
-          - action: !input notify_service
-            data:
-              message: clear_notification
-              data:
-                tag: "{{ notification_tag }}"
+      - action: !input notify_service
+        data:
+          message: clear_notification
+          data:
+            tag: "{{ notification_tag }}"
       - choose:
         - conditions:
           - condition: template
@@ -248,8 +242,8 @@ action:
                 {{ state_attr(target_device, 'friendly_name') }}
                 was automatically {{ past_verb }}.
               data:
-                tag: "{{ notification_tag }}"
-                notification_icon: "state_attr(target_device, 'icon') or 'mdi:alert-circle'"
+                tag: "{{ notification_tag }}_final"
+                notification_icon: "{{ state_attr(target_device, 'icon') or 'mdi:alert-circle' }}"
         default:
         - wait_for_trigger:
           - platform: template

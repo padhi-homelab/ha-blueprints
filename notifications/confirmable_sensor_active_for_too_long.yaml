@@ -76,9 +76,9 @@ variables:
       {%- if h > 0 %}{% set time_str = time_str + [h ~ 'h'] -%}{%- endif -%}
       {%- if m > 0 %}{% set time_str = time_str + [m ~ 'm'] -%}{%- endif -%}
       {%- if s > 0 %}{% set time_str = time_str + [s ~ 's'] -%}{%- endif -%}
-      I'm on it! ({{ time_str | join(' ') }})
+      On it! (Check in {{ time_str | join(' ') }})
     {%- else -%}
-      I'm on it! ({{ raw_ack }})
+      On it! (Check in {{ raw_ack }})
     {%- endif -%}
 
   raw_nag: !input nag_interval
@@ -91,9 +91,9 @@ variables:
       {%- if h > 0 %}{% set time_str = time_str + [h ~ 'h'] -%}{%- endif -%}
       {%- if m > 0 %}{% set time_str = time_str + [m ~ 'm'] -%}{%- endif -%}
       {%- if s > 0 %}{% set time_str = time_str + [s ~ 's'] -%}{%- endif -%}
-      Ignore ({{ time_str | join(' ') }})
+      Ignore for {{ time_str | join(' ') }}
     {%- else -%}
-      Ignore ({{ raw_nag }})
+      Ignore for {{ raw_nag }}
     {%- endif -%}
 
   uid: "{{ range(1000, 9999) | random }}{{ range(1000, 9999) | random }}"

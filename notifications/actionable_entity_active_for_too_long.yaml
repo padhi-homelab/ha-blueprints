@@ -78,9 +78,9 @@ variables:
       {%- if h > 0 %}{% set time_str = time_str + [h ~ 'h'] -%}{%- endif -%}
       {%- if m > 0 %}{% set time_str = time_str + [m ~ 'm'] -%}{%- endif -%}
       {%- if s > 0 %}{% set time_str = time_str + [s ~ 's'] -%}{%- endif -%}
-      Ignore ({{ time_str | join(' ') }})
+      Ignore for {{ time_str | join(' ') }}
     {%- else -%}
-      Ignore ({{ raw_nag }})
+      Ignore for {{ raw_nag }}
     {%- endif -%}
 
   uid: "{{ range(1000, 9999) | random }}{{ range(1000, 9999) | random }}"
@@ -145,9 +145,8 @@ action:
         event_type: mobile_app_notification_action
         event_data:
           action: "{{ action_ignore }}"
-      - platform: state
-        entity_id: !input target_entity
-        to: "{{ states(target_device) != device_state }}"
+      - platform: template
+        value_template: "{{ states(target_device) != device_state }}"
       timeout: !input nag_interval
       continue_on_timeout: true
     - choose:
